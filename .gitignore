@@ -23,3 +23,4 @@ build/
 *.png
 *.bak
 pipeline-outputs/relatorio-final.md
+STATUS.md
