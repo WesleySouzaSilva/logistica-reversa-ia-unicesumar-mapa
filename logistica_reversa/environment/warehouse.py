@@ -9,12 +9,17 @@ O ambiente eh **dinamico** e **estocastico** (ver Questao 1.2 do
 MAPA): residuos podem ser depositados a qualquer momento via
 `deposit_random_waste`, que usa um RNG injetado para garantir
 reprodutibilidade.
+
+Persistencia: `save_json` / `load_json` permitem serializar apenas
+a topologia (sem residuos) para reproducao deterministica de cenarios.
 """
 from __future__ import annotations
 
+import json
 import math
 import random
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Union
 
 import networkx as nx
 
@@ -187,3 +192,87 @@ class Warehouse:
 
     def __contains__(self, sector_id: int) -> bool:
         return self.graph.has_node(sector_id)
+
+    # ---------- Persistencia (JSON) ----------
+
+    def save_json(self, path: Union[str, Path]) -> Path:
+        """Salva a topologia do armazem em JSON (sem residuos).
+
+        Schema::
+
+            {
+              "sectors": [{"id": 0, "x": 0, "y": 0}, ...],
+              "edges":   [{"a": 0, "b": 1, "weight": 1.0}, ...]
+            }
+
+        Args:
+            path: caminho do arquivo de saida. Diretorios ausentes
+                sao criados.
+
+        Returns:
+            O `Path` resolvido do arquivo escrito.
+        """
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "sectors": [
+                {"id": nid, "x": data["x"], "y": data["y"]}
+                for nid, data in self.graph.nodes(data=True)
+            ],
+            "edges": [
+                {"a": a, "b": b, "weight": float(data.get("weight", 1.0))}
+                for a, b, data in self.graph.edges(data=True)
+            ],
+        }
+        out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return out.resolve()
+
+    @classmethod
+    def load_json(cls, path: Union[str, Path]) -> "Warehouse":
+        """Carrega a topologia de um armazem a partir de JSON.
+
+        Apenas nos e arestas sao reconstruidos. Os setores vem
+        sem residuo (`Sector.waste = None`); o residuo sera
+        depositado pela simulacao (eventos dinamicos).
+
+        Args:
+            path: caminho do arquivo JSON.
+
+        Returns:
+            Um novo `Warehouse` com a topologia carregada.
+
+        Raises:
+            FileNotFoundError: se o arquivo nao existir.
+            ValueError: se o JSON estiver malformado, faltando chaves
+                obrigatorias, ou referenciar setores inexistentes.
+        """
+        p = Path(path)
+        if not p.exists():
+            raise FileNotFoundError(f"arquivo de armazem nao encontrado: {p}")
+        try:
+            payload = json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"JSON invalido em {p}: {exc}") from exc
+
+        if not isinstance(payload, dict) or "sectors" not in payload or "edges" not in payload:
+            raise ValueError(
+                f"JSON em {p} deve conter chaves 'sectors' e 'edges'"
+            )
+
+        wh = cls()
+        for s in payload["sectors"]:
+            if not all(k in s for k in ("id", "x", "y")):
+                raise ValueError(f"setor malformado em {p}: {s}")
+            wh.add_sector(
+                Sector(sector_id=int(s["id"]), x=float(s["x"]), y=float(s["y"]))
+            )
+        for e in payload["edges"]:
+            if not all(k in e for k in ("a", "b")):
+                raise ValueError(f"aresta malformada em {p}: {e}")
+            a, b = int(e["a"]), int(e["b"])
+            if a not in wh or b not in wh:
+                raise ValueError(
+                    f"aresta referencia setor inexistente em {p}: {a}-{b}"
+                )
+            wh.add_edge(a, b, weight=float(e.get("weight", 1.0)))
+        return wh
