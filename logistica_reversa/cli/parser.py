@@ -4,12 +4,14 @@ Subcomandos:
 - `run`      : executa UMA simulacao e grava artefatos.
 - `compare`  : executa N simulacoes (uma por planejador) e gera tabela.
 - `snapshot` : salva a topologia de uma grade vazia em JSON.
+- `report`   : agrega N `metrics.csv` previos em `relatorio-final.md`.
 
 Cada subcomando produz:
 - `metrics.md` e `metrics.csv` (tabela de uma linha).
 - `warehouse.png` (plot do grafo + trajetoria).
 - `run.json` (snapshot da configuracao, para reprodutibilidade).
 - `comparison.md` (apenas em `compare`).
+- `relatorio-final.md` (apenas em `report`).
 
 A CLI NAO contem logica de decisao: ela apenas plameja argumentos,
 constroi o ambiente/agente, e chama a `Simulation`.
@@ -18,8 +20,11 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Union
+
+import pandas as pd
 
 from logistica_reversa.agents.model_based import ModelBasedAgent
 from logistica_reversa.environment import Warehouse, generate_grid_warehouse
@@ -214,6 +219,39 @@ def _cmd_snapshot(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_report(args: argparse.Namespace) -> int:
+    """Agrega N `metrics.csv` em `relatorio-final.md` + `relatorio-final.csv`."""
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    frames: list[pd.DataFrame] = []
+    for run_dir in args.run_dirs:
+        csv_path = Path(run_dir) / "metrics.csv"
+        if not csv_path.exists():
+            raise FileNotFoundError(
+                f"metrics.csv nao encontrado em {csv_path}"
+            )
+        frames.append(pd.read_csv(csv_path))
+
+    df = pd.concat(frames, ignore_index=True)
+    csv_out = out_dir / "relatorio-final.csv"
+    df.to_csv(csv_out, index=False)
+
+    header = (
+        f"# Relatorio Final\n\n"
+        f"- Diretorio de saida: `{out_dir}`\n"
+        f"- Numero de corridas agregadas: {len(frames)}\n"
+        f"- Gerado em: {datetime.now().isoformat(timespec='seconds')}\n\n"
+    )
+    md_out = out_dir / "relatorio-final.md"
+    md_out.write_text(header + format_table_md(df), encoding="utf-8")
+
+    print(f"[report] {len(frames)} corridas agregadas em {out_dir}/")
+    print(f"  - {md_out.name}")
+    print(f"  - {csv_out.name}")
+    return 0
+
+
 # ---------- Parser ----------
 
 
@@ -291,6 +329,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", type=str, default="data/warehouse.json"
     )
     p_snap.set_defaults(func=_cmd_snapshot)
+
+    # --- report ---
+    p_report = sub.add_parser(
+        "report",
+        help="agrega varios metrics.csv em um relatorio final",
+    )
+    p_report.add_argument(
+        "--run-dirs",
+        nargs="+",
+        required=True,
+        help="um ou mais diretorios, cada um contendo um metrics.csv",
+    )
+    p_report.add_argument(
+        "--output-dir",
+        type=str,
+        default="pipeline-outputs/final-report",
+    )
+    p_report.set_defaults(func=_cmd_report)
 
     return parser
 

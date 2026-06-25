@@ -106,3 +106,53 @@ class TestFormatTableMd:
         assert "A*" in md
         assert "astar" in md
         assert "Coletado (kg)" in md
+
+    def test_csv_round_trip(self) -> None:
+        """Round-trip DataFrame -> CSV -> DataFrame preserva schema.
+
+        Trava o contrato entre `build_metrics_table` (escritor)
+        e o subcomando `report` (leitor).
+        """
+        runs = [
+            RunMetrics(
+                label="A* + Model-Based",
+                algorithm="astar",
+                collected_kg=10.0,
+                collections=5,
+                moves=12,
+                waits=2,
+                steps=19,
+                energy_consumed=4.0,
+                efficiency=2.5,
+            ),
+            RunMetrics(
+                label="BFS + Model-Based",
+                algorithm="bfs",
+                collected_kg=9.0,
+                collections=5,
+                moves=15,
+                waits=1,
+                steps=21,
+                energy_consumed=4.5,
+                efficiency=2.0,
+            ),
+        ]
+        original = build_metrics_table(runs)
+        # Round-trip via CSV.
+        import io
+
+        buf = io.StringIO()
+        original.to_csv(buf, index=False)
+        loaded = pd.read_csv(io.StringIO(buf.getvalue()))
+
+        # Schema preservado.
+        assert list(loaded.columns) == list(original.columns)
+        assert len(loaded) == len(original)
+        # Valores preservados.
+        assert loaded.iloc[0]["Config"] == original.iloc[0]["Config"]
+        assert loaded.iloc[1]["Algoritmo"] == original.iloc[1]["Algoritmo"]
+        assert loaded.iloc[0]["Coletado (kg)"] == original.iloc[0]["Coletado (kg)"]
+        # Formatacao Markdown continua funcionando no DataFrame lido.
+        md = format_table_md(loaded)
+        assert "A* + Model-Based" in md
+        assert "BFS + Model-Based" in md

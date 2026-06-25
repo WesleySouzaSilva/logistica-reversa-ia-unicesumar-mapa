@@ -2,17 +2,17 @@
 
 Projeto da Atividade MAPA de Inteligência Artificial — implementação completa que cobre os conceitos de **PEAS**, **classificação de ambientes**, **agentes reativos baseados em modelo** e **algoritmos de busca** (BFS, DFS, UCS, Greedy, A*) com visualização gráfica.
 
-> **Status**: 7/8 PRs entregues. Falta apenas a validação final (PR #8).
+> **Status**: 8/8 PRs entregues. Implementação completa.
 
 ---
 
 ## O que o projeto demonstra
 
-| Conceito (Russel & Norvig) | Onde será implementado |
+| Conceito (Russel & Norvig) | Onde está implementado |
 |---|---|
 | PEAS (Performance, Environment, Actuators, Sensors) | `domain/` + `agents/` |
 | Ambiente parcialmente observável, dinâmico, estocástico, sequencial | `environment/warehouse.py` (eventos dinâmicos) |
-| 4 tipos de agentes (reflexo simples, baseado em modelo, objetivo, utilidade) | `agents/` |
+| Agente baseado em modelo (ModelBasedAgent) com planejador A* e regra anti-retorno | `agents/model_based.py` |
 | Algoritmos de busca (BFS, DFS, UCS, Greedy, A*) | `search/` |
 | Heurísticas h(n) admissíveis (Manhattan, Euclidiana) | `search/heuristics.py` |
 | Métricas comparativas | `reports/metrics.py` |
@@ -44,7 +44,7 @@ pip install -r requirements.txt
 
 ## Como usar a CLI
 
-A interface de linha de comando oferece três subcomandos:
+A interface de linha de comando oferece quatro subcomandos:
 
 ```bash
 # 1. Executa UMA simulacao e gera os artefatos (metrics, PNG, run.json).
@@ -55,6 +55,9 @@ python main.py compare --planners astar bfs --max-steps 100
 
 # 3. Salva a topologia vazia de uma grade em JSON para reutilizacao.
 python main.py snapshot --rows 5 --cols 5 --out data/warehouse.json
+
+# 4. Agrega N `metrics.csv` de corridas previas em um relatorio final.
+python main.py report --run-dirs pipeline-outputs/run1 pipeline-outputs/run2
 ```
 
 Saídas geradas (em `pipeline-outputs/` por padrão):
@@ -65,61 +68,82 @@ Saídas geradas (em `pipeline-outputs/` por padrão):
 | `warehouse.png` | Grafo do armazém colorido por estado + trajetória do agente |
 | `run.json` | Snapshot da configuração (reprodutibilidade) |
 | `comparison.md` / `comparison.csv` | Tabela multi-linha (apenas no `compare`) |
+| `relatorio-final.md` / `relatorio-final.csv` | Tabela agregada de N corridas (apenas no `report`) |
 
 Atalhos prontos: `./run.sh` (Linux/macOS) ou `run.bat` (Windows) executam `python main.py run --rows 5 --cols 5`.
 
 ---
 
-## Respostas da Questão 1 (MAPA)
+## Respostas da Questao 1 (MAPA)
 
-### 1.1 — Descrição PEAS
+A resposta completa de cada item vive em um arquivo dedicado na
+pasta `docs/`. Aqui vai um resumo executivo + link para o detalhe.
 
-| Componente | Descrição |
-|---|---|
-| **P**erformance | Volume de material processado (kg) / energia gasta — `eficiencia = coleta / energia` |
-| **E**nvironment | Centro de distribuição com N setores; parcialmente observável, dinâmico, estocástico, sequencial |
-| **A**ctuators | Motores de locomoção, braço coletor, sinalizador de status |
-| **S**ensors | Sensor de presença de resíduo (tipo + peso), odômetro, sensor de bateria |
+### 1.1 — Descricao PEAS
 
-### 1.2 — Classificação do Ambiente
-
-| Propriedade | Valor | Justificativa |
+| Componente | Resumo | Onde esta implementado |
 |---|---|---|
-| Observabilidade | **Parcial** | O robô vê apenas o setor atual + adjacentes |
-| Determinismo | **Estocástico** | Novos resíduos aparecem aleatoriamente |
-| Episodicidade | **Sequencial** | Decisão atual afeta as próximas (energia, setores visitados) |
-| Estaticidade | **Dinâmico** | Ambiente muda enquanto o agente decide |
-| Discretude | **Discreto** | Conjunto finito de setores e ações |
+| **P**erformance | Volume coletado (kg) / energia gasta / passos totais | `reports/metrics.py::RunMetrics` |
+| **E**nvironment | Centro de distribuicao como grafo de setores com residuos dinamicos | `environment/warehouse.py` |
+| **A**ctuators | Acoes discretas `MOVE`, `COLLECT`, `WAIT` | `agents/base.py::Action` + `services/simulation.py` |
+| **S**ensors | `perceive()` recebe setores com residuo + vizinhos + estado interno | `agents/model_based.py` |
 
-### 1.3 — Pseudocódigo do Agente Reativo Baseado em Modelo
+Detalhamento completo (incluindo a tabela P/E/A/S com todas as
+sub-metricas, sensores e onde cada teste valida cada item):
+**[docs/peas.md](docs/peas.md)**
 
-```text
-FUNÇÃO agente_baseado_em_modelo(percepção):
-    estado_interno.atualizar(percepção)
-    setor_atual = estado_interno.setor_atual
+### 1.2 — Classificacao do Ambiente
 
-    # Ação reativa: coleta se há resíduo
-    SE setor_atual tem_resíduo:
-        estado_interno.marcar_limpo(setor_atual, passo_atual)
-        RETORNAR None  # ação local: coletar
+| Dimensao | Valor | Resumo da justificativa |
+|---|---|---|
+| Observabilidade | **Parcialmente observavel** | `perceive()` recebe apenas uma lista, nao o estado global |
+| Determinismo | **Nao deterministico (estocastico)** | `deposit_random_waste` injeta residuos a cada passo com prob. `p` |
+| Episodicidade | **Sequencial** | `AgentState.cleaned` guarda historico que afeta decisoes futuras |
+| Estaticidade | **Dinamico** | Residuos surgem enquanto o agente delibera |
+| Discretude | **Discreto** | Setores inteiros, acoes enumeradas, tempo em passos |
 
-    # Usa modelo interno para decidir próximo setor
-    candidatos = vizinhos(setor_atual)
+Justificativas completas (com trechos de codigo que comprovam cada
+classificacao e a consequencia para o tipo de agente escolhido):
+**[docs/ambiente-classificacao.md](docs/ambiente-classificacao.md)**
 
-    # Regra anti-retorno (preserva autonomia energética):
-    # não volta a setor recém-limpo antes de T passos
-    candidatos = [c para c em candidatos
-                  SE estado_interno.pode_retornar(c, passo_atual, T)]
+### 1.3 — Agente Reativo Baseado em Modelo
 
-    SE candidatos vazio:
-        RETORNAR None  # espera novo evento
+Em vez de transcrever um pseudocodigo didatico, esta secao
+apresenta o **codigo real** que implementa o agente e mostra como
+cada bloco atende ao requisito de "estado interno + regra
+anti-retorno com cooldown T".
 
-    próximo = argmax(candidatos, key=peso_resíduo)
-    estado_interno.mover(próximo)
-    RETORNAR próximo
-```
+Resumo do comportamento (um passo de `act()`):
 
-> Implementação real será entregue no PR correspondente à camada `agents/`.
+1. Se ha residuo no setor atual → `COLLECT` (regra reativa direta).
+2. Caso contrario, filtra os goals pela regra `state.can_return(g)`
+   — equivalente a "T passos minimos antes de revisitar".
+3. Se nao sobra goal → `WAIT` (preserva energia).
+4. Constroi `SearchProblem` com os goals restantes e chama o
+   planejador injetado (default: A* com heuristica Manhattan).
+5. Caminha para o segundo no do caminho planejado → `MOVE`.
+
+Codigo completo de `act()` + estado interno (`AgentState`) +
+mapeamento entre o pseudocodigo do enunciado e o codigo real:
+**[docs/agente-baseado-em-modelo.md](docs/agente-baseado-em-modelo.md)**
+
+### Exemplo visual de uma simulacao
+
+A imagem abaixo foi gerada com
+`python main.py run --rows 5 --cols 5 --max-steps 50 --seed 7 --planner astar`
+e mostra o grafo do armazem (nos coloridos pelo estado: livre /
+com residuo / bloqueado) e a trajetoria percorrida pelo agente
+durante a coleta:
+
+![Exemplo de simulacao](docs/example/warehouse.png)
+
+Legenda da imagem:
+
+- **Verde**: setor ja limpo (com trajectory point).
+- **Vermelho**: setor com residuo ainda nao coletado.
+- **Cinza**: setor vazio.
+- **Linha**: trajetoria do agente (ordem cronologica).
+- **Ponto inicial**: marcado com borda destacada.
 
 ---
 
@@ -131,7 +155,7 @@ logistica_reversa/
 ├── domain/                  Modelos puros (enums, dataclasses)
 ├── environment/             Grafo + eventos dinâmicos
 ├── search/                  BFS, DFS, UCS, Greedy, A*, heurísticas
-├── agents/                  4 tipos de agentes
+├── agents/                  Agente baseado em modelo
 ├── services/                Simulação
 ├── reports/                 Métricas com pandas
 ├── visualization/           Matplotlib
@@ -157,7 +181,7 @@ logistica_reversa/
 | 2 | `domain/` (enums, dataclasses) + testes |
 | 3 | `environment/` (grafo do armazém + gerador) + testes |
 | 4 | `search/` (BFS, DFS, UCS, Greedy, A*, heurísticas) + testes |
-| 5 | `agents/` (4 tipos, foco no baseado em modelo) + testes |
+| 5 | `agents/` (ModelBasedAgent com A* + regra anti-retorno) + testes |
 | 6 | `services/simulation.py` + `reports/metrics.py` + testes |
 | 7 | `visualization/plotter.py` + `main.py` (CLI) + `data/warehouse.json` + scripts |
 | 8 | README final + validação completa |
