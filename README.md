@@ -137,13 +137,12 @@ durante a coleta:
 
 ![Exemplo de simulacao](docs/example/warehouse.png)
 
-Legenda da imagem:
+Legenda da imagem (conforme `logistica_reversa/visualization/plotter.py`):
 
-- **Verde**: setor ja limpo (com trajectory point).
-- **Vermelho**: setor com residuo ainda nao coletado.
-- **Cinza**: setor vazio.
-- **Linha**: trajetoria do agente (ordem cronologica).
-- **Ponto inicial**: marcado com borda destacada.
+- **Verde**: setor com residuo ainda nao coletado.
+- **Cinza**: setor vazio (sem residuo no instante da captura).
+- **Linha vermelha**: trajetoria do agente (ordem cronologica dos setores visitados).
+- **Borda azul destacada**: setor onde o agente parou ao fim da simulacao (ultimo da trajetoria).
 
 ---
 
