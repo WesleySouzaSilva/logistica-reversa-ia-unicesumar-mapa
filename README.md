@@ -129,11 +129,11 @@ mapeamento entre o pseudocodigo do enunciado e o codigo real:
 
 ### Exemplo visual de uma simulacao
 
-A imagem abaixo foi gerada com
-`python main.py run --rows 5 --cols 5 --max-steps 50 --seed 7 --planner astar`
-e mostra o grafo do armazem (nos coloridos pelo estado: livre /
-com residuo / bloqueado) e a trajetoria percorrida pelo agente
-durante a coleta:
+A imagem abaixo foi gerada com `python -m docs.example._regenerate`
+(script auxiliar em `docs/example/_regenerate.py`, grade 5x5, seed=3,
+4 passos, A*, fracao inicial de residuos 0.4, sem deposito dinamico)
+e mostra o grafo do armazem (nos coloridos pelo estado final da
+simulacao) e a trajetoria percorrida pelo agente durante a coleta:
 
 ![Exemplo de simulacao](docs/example/warehouse.png)
 
