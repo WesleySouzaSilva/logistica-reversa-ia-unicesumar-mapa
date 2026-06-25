@@ -21,6 +21,7 @@ build/
 
 # Projeto
 *.png
+!docs/example/*.png
 *.bak
 pipeline-outputs/relatorio-final.md
 STATUS.md
