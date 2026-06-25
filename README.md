@@ -2,17 +2,17 @@
 
 Projeto da Atividade MAPA de Inteligência Artificial — implementação completa que cobre os conceitos de **PEAS**, **classificação de ambientes**, **agentes reativos baseados em modelo** e **algoritmos de busca** (BFS, DFS, UCS, Greedy, A*) com visualização gráfica.
 
-> **Status**: 7/8 PRs entregues. Falta apenas a validação final (PR #8).
+> **Status**: 8/8 PRs entregues. Implementação completa.
 
 ---
 
 ## O que o projeto demonstra
 
-| Conceito (Russel & Norvig) | Onde será implementado |
+| Conceito (Russel & Norvig) | Onde está implementado |
 |---|---|
 | PEAS (Performance, Environment, Actuators, Sensors) | `domain/` + `agents/` |
 | Ambiente parcialmente observável, dinâmico, estocástico, sequencial | `environment/warehouse.py` (eventos dinâmicos) |
-| 4 tipos de agentes (reflexo simples, baseado em modelo, objetivo, utilidade) | `agents/` |
+| Agente baseado em modelo (ModelBasedAgent) com planejador A* e regra anti-retorno | `agents/model_based.py` |
 | Algoritmos de busca (BFS, DFS, UCS, Greedy, A*) | `search/` |
 | Heurísticas h(n) admissíveis (Manhattan, Euclidiana) | `search/heuristics.py` |
 | Métricas comparativas | `reports/metrics.py` |
@@ -44,7 +44,7 @@ pip install -r requirements.txt
 
 ## Como usar a CLI
 
-A interface de linha de comando oferece três subcomandos:
+A interface de linha de comando oferece quatro subcomandos:
 
 ```bash
 # 1. Executa UMA simulacao e gera os artefatos (metrics, PNG, run.json).
@@ -55,6 +55,9 @@ python main.py compare --planners astar bfs --max-steps 100
 
 # 3. Salva a topologia vazia de uma grade em JSON para reutilizacao.
 python main.py snapshot --rows 5 --cols 5 --out data/warehouse.json
+
+# 4. Agrega N `metrics.csv` de corridas previas em um relatorio final.
+python main.py report --run-dirs pipeline-outputs/run1 pipeline-outputs/run2
 ```
 
 Saídas geradas (em `pipeline-outputs/` por padrão):
@@ -65,6 +68,7 @@ Saídas geradas (em `pipeline-outputs/` por padrão):
 | `warehouse.png` | Grafo do armazém colorido por estado + trajetória do agente |
 | `run.json` | Snapshot da configuração (reprodutibilidade) |
 | `comparison.md` / `comparison.csv` | Tabela multi-linha (apenas no `compare`) |
+| `relatorio-final.md` / `relatorio-final.csv` | Tabela agregada de N corridas (apenas no `report`) |
 
 Atalhos prontos: `./run.sh` (Linux/macOS) ou `run.bat` (Windows) executam `python main.py run --rows 5 --cols 5`.
 
@@ -119,8 +123,6 @@ FUNÇÃO agente_baseado_em_modelo(percepção):
     RETORNAR próximo
 ```
 
-> Implementação real será entregue no PR correspondente à camada `agents/`.
-
 ---
 
 ## Estrutura do projeto (Clean Architecture)
@@ -131,7 +133,7 @@ logistica_reversa/
 ├── domain/                  Modelos puros (enums, dataclasses)
 ├── environment/             Grafo + eventos dinâmicos
 ├── search/                  BFS, DFS, UCS, Greedy, A*, heurísticas
-├── agents/                  4 tipos de agentes
+├── agents/                  Agente baseado em modelo
 ├── services/                Simulação
 ├── reports/                 Métricas com pandas
 ├── visualization/           Matplotlib
@@ -157,7 +159,7 @@ logistica_reversa/
 | 2 | `domain/` (enums, dataclasses) + testes |
 | 3 | `environment/` (grafo do armazém + gerador) + testes |
 | 4 | `search/` (BFS, DFS, UCS, Greedy, A*, heurísticas) + testes |
-| 5 | `agents/` (4 tipos, foco no baseado em modelo) + testes |
+| 5 | `agents/` (ModelBasedAgent com A* + regra anti-retorno) + testes |
 | 6 | `services/simulation.py` + `reports/metrics.py` + testes |
 | 7 | `visualization/plotter.py` + `main.py` (CLI) + `data/warehouse.json` + scripts |
 | 8 | README final + validação completa |
