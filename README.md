@@ -2,7 +2,7 @@
 
 Projeto da Atividade MAPA de Inteligência Artificial — implementação completa que cobre os conceitos de **PEAS**, **classificação de ambientes**, **agentes reativos baseados em modelo** e **algoritmos de busca** (BFS, DFS, UCS, Greedy, A*) com visualização gráfica.
 
-> **Status**: Em desenvolvimento. Este PR entrega apenas a documentação inicial e o setup do projeto. O código será adicionado em PRs seguintes, um por camada.
+> **Status**: 7/8 PRs entregues. Falta apenas a validação final (PR #8).
 
 ---
 
@@ -39,6 +39,34 @@ pip install -r requirements.txt
 ```
 
 > Requisito: Python ≥ 3.10.
+
+---
+
+## Como usar a CLI
+
+A interface de linha de comando oferece três subcomandos:
+
+```bash
+# 1. Executa UMA simulacao e gera os artefatos (metrics, PNG, run.json).
+python main.py run --rows 5 --cols 5 --max-steps 200 --seed 42 --planner astar
+
+# 2. Compara varios planejadores e gera uma tabela comparativa.
+python main.py compare --planners astar bfs --max-steps 100
+
+# 3. Salva a topologia vazia de uma grade em JSON para reutilizacao.
+python main.py snapshot --rows 5 --cols 5 --out data/warehouse.json
+```
+
+Saídas geradas (em `pipeline-outputs/` por padrão):
+
+| Arquivo | Conteúdo |
+|---|---|
+| `metrics.md` / `metrics.csv` | Tabela de uma linha com kg, coletas, energia, eficiência (PEAS) |
+| `warehouse.png` | Grafo do armazém colorido por estado + trajetória do agente |
+| `run.json` | Snapshot da configuração (reprodutibilidade) |
+| `comparison.md` / `comparison.csv` | Tabela multi-linha (apenas no `compare`) |
+
+Atalhos prontos: `./run.sh` (Linux/macOS) ou `run.bat` (Windows) executam `python main.py run --rows 5 --cols 5`.
 
 ---
 
