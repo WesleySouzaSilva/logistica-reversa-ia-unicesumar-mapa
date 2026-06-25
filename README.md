@@ -129,20 +129,40 @@ mapeamento entre o pseudocodigo do enunciado e o codigo real:
 
 ### Exemplo visual de uma simulacao
 
-A imagem abaixo foi gerada com `python -m docs.example._regenerate`
-(script auxiliar em `docs/example/_regenerate.py`, grade 5x5, seed=3,
-4 passos, A*, fracao inicial de residuos 0.4, sem deposito dinamico)
-e mostra o grafo do armazem (nos coloridos pelo estado final da
-simulacao) e a trajetoria percorrida pelo agente durante a coleta:
+A pasta `docs/example/` contem duas imagens geradas pelo mesmo
+plotter (`logistica_reversa/visualization/plotter.py`), cada uma
+evidenciando um aspecto diferente da simulacao:
 
-![Exemplo de simulacao](docs/example/warehouse.png)
+**1. `warehouse.png` — simulacao completa (gerada pelo CLI)**
 
-Legenda da imagem (conforme `logistica_reversa/visualization/plotter.py`):
+Gerada com `python main.py run --rows 5 --cols 5 --max-steps 50
+--seed 7 --planner astar`. Por padrao, o subcomando `run` recarrega
+o armazem **limpo** antes de plotar (ver `cli/parser.py:_write_run_artifacts`),
+entao o grafo sai todo em cinza: o foco desta imagem eh a **trajetoria
+completa** do agente em uma corrida longa.
+
+![Simulacao completa via CLI](docs/example/warehouse.png)
+
+**2. `warehouse-final.png` — estado final com residuos remanescentes**
+
+Gerada com `python -m docs.example._regenerate` (script auxiliar em
+`docs/example/_regenerate.py`, seed=3, max_steps=4, fracao inicial de
+residuos 0.4, sem deposito dinamico). Diferente do CLI, este script
+plota o armazem **no estado final** da simulacao, entao todos os
+elementos da legenda aparecem de uma vez:
+
+![Estado final da simulacao](docs/example/warehouse-final.png)
+
+Legenda das cores (conforme `logistica_reversa/visualization/plotter.py`):
 
 - **Verde**: setor com residuo ainda nao coletado.
 - **Cinza**: setor vazio (sem residuo no instante da captura).
 - **Linha vermelha**: trajetoria do agente (ordem cronologica dos setores visitados).
 - **Borda azul destacada**: setor onde o agente parou ao fim da simulacao (ultimo da trajetoria).
+
+A imagem 1 mostra a trajetoria; a imagem 2 mostra como ler o estado
+final do armazem. Juntas, dao a visao completa do que o plotter
+representa.
 
 ---
 
